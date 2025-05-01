@@ -13,10 +13,13 @@ import ru.yandex.practicum.repository.PostRepository;
 import ru.yandex.practicum.repository.PostTagRepository;
 import ru.yandex.practicum.repository.TagRepository;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+
+import static org.apache.commons.io.FilenameUtils.getExtension;
 
 @Service
 @RequiredArgsConstructor
@@ -63,23 +66,67 @@ public class PostService {
 
         Long postId = postRepository.save(post);
 
+        if (image != null && !image.isEmpty()) {
+            try {
+                String filename = "post-" + postId + "." + getExtension(image.getOriginalFilename());
+                Path uploadDir = Paths.get(System.getProperty("user.dir"), "uploads");
+                Files.createDirectories(uploadDir);
+
+                Path path = uploadDir.resolve(filename);
+
+                try {
+                    Files.createDirectories(path.getParent());
+                    image.transferTo(path.toFile());
+                    imageUrl = filename;
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to save image", e);
+                }
+
+                postRepository.updateImageUrl(postId, imageUrl);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to upload image", e);
+            }
+        }
+
         List<String> tags = parseTags(tagsText);
         saveTags(tags, postId);
     }
 
     public void updatePost(Long id, String title, String text, String tagsText, MultipartFile image) {
-        String imageUrl = null;
+        Post existingPost = postRepository.findByPostId(id)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        Post post = Post.builder()
+        String imageUrl = existingPost.getImageUrl();
+
+        if (image != null && !image.isEmpty()) {
+            try {
+                String filename = "post-" + id + "." + getExtension(image.getOriginalFilename());
+                Path uploadDir = Paths.get(System.getProperty("user.dir"), "uploads");
+                Files.createDirectories(uploadDir);
+
+                Path path = uploadDir.resolve(filename);
+
+                if (imageUrl != null) {
+                    Files.deleteIfExists(uploadDir.resolve(imageUrl));
+                }
+
+                image.transferTo(path.toFile());
+                imageUrl = filename;
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to update image", e);
+            }
+        }
+
+        Post updatedPost = Post.builder()
                 .id(id)
                 .title(title)
                 .text(text)
                 .imageUrl(imageUrl)
                 .build();
 
-        postRepository.update(post);
-        postTagRepository.deleteByPostId(id);
+        postRepository.update(updatedPost);
 
+        postTagRepository.deleteByPostId(id);
         List<String> tags = parseTags(tagsText);
         saveTags(tags, id);
     }

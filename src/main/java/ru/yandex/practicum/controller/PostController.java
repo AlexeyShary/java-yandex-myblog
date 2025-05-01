@@ -39,7 +39,11 @@ public class PostController {
     }
 
     @GetMapping("/posts/{postId}")
-    public String getPostByIdForm(@PathVariable("postId") Long postId, Model model) {
+    public String getPostByIdForm(
+            @PathVariable("postId")
+            Long postId,
+            Model model
+    ) {
         PostDto post = postService.getPostById(postId);
         model.addAttribute("post", post);
         return TemplateNames.POST.name;
@@ -52,7 +56,10 @@ public class PostController {
     }
 
     @GetMapping("/posts/{id}/edit")
-    public String getPostEditForm(@PathVariable("id") Long id, Model model) {
+    public String getPostEditForm(
+            @PathVariable("id") Long id,
+            Model model
+    ) {
         PostDto post = postService.getPostById(id);
 
         model.addAttribute("post", PostEditDto.builder()

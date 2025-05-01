@@ -73,6 +73,10 @@ public class PostRepository {
         );
     }
 
+    public void updateImageUrl(Long id, String imageUrl) {
+        jdbcTemplate.update("UPDATE posts SET image_url = ? WHERE id = ?", imageUrl, id);
+    }
+
     public void updateLikes(Long id, int delta) {
         jdbcTemplate.update("UPDATE posts SET likes_count = likes_count + ? WHERE id = ?", delta, id);
     }
