@@ -2,6 +2,7 @@ package ru.yandex.practicum.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import ru.yandex.practicum.dto.CommentDto;
 import ru.yandex.practicum.dto.PostDto;
 import ru.yandex.practicum.model.Post;
@@ -12,6 +13,7 @@ import ru.yandex.practicum.repository.PostRepository;
 import ru.yandex.practicum.repository.PostTagRepository;
 import ru.yandex.practicum.repository.TagRepository;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,15 +45,44 @@ public class PostService {
                 .toList();
     }
 
-//    public int getTotalPostCount(String searchTag) {
-//        if (searchTag == null || searchTag.isBlank()) {
-//            return (int) postRepository.count();
-//        } else {
-//            Optional<Tag> tagOpt = tagRepository.findByName(searchTag);
-//            if (tagOpt.isEmpty()) return 0;
-//            return postTagRepository.findByTagId(tagOpt.get().getId()).size();
-//        }
-//    }
+    public PostDto getPostById(long id) {
+        Post post = postRepository.findByPostId(id)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found: " + id));
+        return toDto(post);
+    }
+
+    public void createPost(String title, String text, String tagsText, MultipartFile image) {
+        String imageUrl = null;
+
+        Post post = Post.builder()
+                .title(title)
+                .text(text)
+                .imageUrl(imageUrl)
+                .likesCount(0)
+                .build();
+
+        Long postId = postRepository.save(post);
+
+        List<String> tags = parseTags(tagsText);
+        saveTags(tags, postId);
+    }
+
+    public void updatePost(Long id, String title, String text, String tagsText, MultipartFile image) {
+        String imageUrl = null;
+
+        Post post = Post.builder()
+                .id(id)
+                .title(title)
+                .text(text)
+                .imageUrl(imageUrl)
+                .build();
+
+        postRepository.update(post);
+        postTagRepository.deleteByPostId(id);
+
+        List<String> tags = parseTags(tagsText);
+        saveTags(tags, id);
+    }
 
     private PostDto toDto(Post post) {
         List<String> tags = postTagRepository.findByPostId(post.getId()).stream()
@@ -67,6 +98,8 @@ public class PostService {
         String textPreview = post.getText() != null ?
                 post.getText().split("\n")[0] : "";
 
+        List<String> textParts = Arrays.asList(post.getText().split("\\n+"));
+
         return PostDto.builder()
                 .id(post.getId())
                 .title(post.getTitle())
@@ -75,6 +108,25 @@ public class PostService {
                 .textPreview(textPreview)
                 .tags(tags)
                 .comments(comments)
+                .textParts(textParts)
                 .build();
+    }
+
+    private List<String> parseTags(String tagsText) {
+        return Arrays.stream(tagsText.split("[,\\s]+"))
+                .map(String::trim)
+                .filter(t -> !t.isBlank())
+                .map(String::toLowerCase)
+                .distinct()
+                .toList();
+    }
+
+    private void saveTags(List<String> tags, long postId) {
+        for (String tagName : tags) {
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> tagRepository.save(new Tag(null, tagName)));
+
+            postTagRepository.save(new PostTag(null, postId, tag.getId()));
+        }
     }
 }

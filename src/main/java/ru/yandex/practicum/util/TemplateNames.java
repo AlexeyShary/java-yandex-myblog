@@ -1,9 +1,10 @@
 package ru.yandex.practicum.util;
 
 public enum TemplateNames {
-    ADD_POST("post-add"),
+    EDIT("edit"),
     POST("post"),
-    POSTS("posts");
+    POSTS("posts"),
+    REDIRECT_POSTS("redirect:/posts");
 
     public final String name;
 

@@ -11,13 +11,9 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PostDto {
+public class PostEditDto {
     private Long id;
     private String title;
-    private String textPreview;
-    private String imageUrl;
-    private int likesCount;
-    private List<String> tags;
-    private List<CommentDto> comments;
-    private List<String> textParts;
+    private String text;
+    private String tagsAsText;
 }

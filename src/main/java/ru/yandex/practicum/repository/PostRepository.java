@@ -1,6 +1,7 @@
 package ru.yandex.practicum.repository;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.model.Post;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Repository
@@ -15,6 +17,19 @@ import java.util.stream.Collectors;
 public class PostRepository {
     private final JdbcTemplate jdbcTemplate;
     private final RowMapper<Post> rowMapper = BeanPropertyRowMapper.newInstance(Post.class);
+
+    public Optional<Post> findByPostId(long postId) {
+        try {
+            Post post = jdbcTemplate.queryForObject(
+                    "SELECT * FROM posts WHERE id = ?",
+                    rowMapper,
+                    postId
+            );
+            return Optional.of(post);
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
 
     public List<Post> findPaged(int offset, int limit) {
         return jdbcTemplate.query(
@@ -33,6 +48,28 @@ public class PostRepository {
                 rowMapper,
                 limit,
                 offset
+        );
+    }
+
+    public Long save(Post post) {
+        jdbcTemplate.update(
+                "INSERT INTO posts (title, text, image_url, likes_count) VALUES (?, ?, ?, ?)",
+                post.getTitle(),
+                post.getText(),
+                post.getImageUrl(),
+                post.getLikesCount()
+        );
+
+        return jdbcTemplate.queryForObject("SELECT MAX(id) FROM posts", Long.class);
+    }
+
+    public void update(Post post) {
+        jdbcTemplate.update(
+                "UPDATE posts SET title = ?, text = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                post.getTitle(),
+                post.getText(),
+                post.getImageUrl(),
+                post.getId()
         );
     }
 }
