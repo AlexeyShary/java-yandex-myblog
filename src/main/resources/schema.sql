@@ -1,0 +1,40 @@
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS post_tags;
+DROP TABLE IF EXISTS tags;
+DROP TABLE IF EXISTS posts;
+
+CREATE TABLE posts
+(
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    title       VARCHAR(255) NOT NULL,
+    text        TEXT         NOT NULL,
+    image_url   VARCHAR(512),
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    likes_count INT       DEFAULT 0
+);
+
+CREATE TABLE tags
+(
+    id   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL
+);
+
+CREATE TABLE post_tags
+(
+    post_id BIGINT,
+    tag_id  BIGINT,
+    PRIMARY KEY (post_id, tag_id),
+    FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
+);
+
+CREATE TABLE comments
+(
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    post_id    BIGINT,
+    text       TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+);
