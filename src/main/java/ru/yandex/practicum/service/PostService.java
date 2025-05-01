@@ -84,6 +84,14 @@ public class PostService {
         saveTags(tags, id);
     }
 
+    public void likePost(Long id, boolean like) {
+        postRepository.updateLikes(id, like ? 1 : -1);
+    }
+
+    public void deletePost(Long id) {
+        postRepository.deleteById(id);
+    }
+
     private PostDto toDto(Post post) {
         List<String> tags = postTagRepository.findByPostId(post.getId()).stream()
                 .map(pt -> tagRepository.findById(pt.getTagId()).orElse(null))

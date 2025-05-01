@@ -14,12 +14,16 @@ import ru.yandex.practicum.util.TemplateNames;
 import java.util.List;
 
 @Controller
-@RequestMapping("/posts")
 @RequiredArgsConstructor
 public class PostController {
     private final PostService postService;
 
-    @GetMapping
+    @GetMapping("/")
+    public String redirectRoot() {
+        return TemplateNames.REDIRECT_POSTS.name;
+    }
+
+    @GetMapping("/posts")
     public String getPostsForm(
             @RequestParam(name = "search", defaultValue = "") String search,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
@@ -34,20 +38,20 @@ public class PostController {
         return TemplateNames.POSTS.name;
     }
 
-    @GetMapping("/{postId}")
+    @GetMapping("/posts/{postId}")
     public String getPostByIdForm(@PathVariable("postId") Long postId, Model model) {
         PostDto post = postService.getPostById(postId);
         model.addAttribute("post", post);
         return TemplateNames.POST.name;
     }
 
-    @GetMapping("/add")
+    @GetMapping("/posts/add")
     public String getPostAddForm(Model model) {
         model.addAttribute("post", null);
         return TemplateNames.EDIT.name;
     }
 
-    @GetMapping("/{id}/edit")
+    @GetMapping("/posts/{id}/edit")
     public String getPostEditForm(@PathVariable("id") Long id, Model model) {
         PostDto post = postService.getPostById(id);
 
@@ -61,7 +65,7 @@ public class PostController {
         return TemplateNames.EDIT.name;
     }
 
-    @PostMapping
+    @PostMapping("/posts")
     public String createPost(
             @RequestParam("title") String title,
             @RequestParam("text") String text,
@@ -72,7 +76,7 @@ public class PostController {
         return TemplateNames.REDIRECT_POSTS.name;
     }
 
-    @PostMapping("/{id}")
+    @PostMapping("/posts/{id}")
     public String updatePost(
             @PathVariable("id") Long id,
             @RequestParam("title") String title,
@@ -82,5 +86,25 @@ public class PostController {
     ) {
         postService.updatePost(id, title, text, tags, image);
         return TemplateNames.REDIRECT_POSTS.name;
+    }
+
+    @PostMapping("/posts/{id}/like")
+    public String likePost(
+            @PathVariable("id") Long id,
+            @RequestParam("like") boolean like
+    ) {
+        postService.likePost(id, like);
+        return TemplateNames.REDIRECT_POSTS.name + "/" + id;
+    }
+
+    @PostMapping("/posts/{id}/edit")
+    public String redirectToEdit(@PathVariable("id") Long id) {
+        return TemplateNames.REDIRECT_POSTS.name + "/" + id + "/edit";
+    }
+
+    @PostMapping("/posts/{id}/delete")
+    public String deletePost(@PathVariable("id") Long id) {
+        postService.deletePost(id);
+        return "redirect:/posts";
     }
 }

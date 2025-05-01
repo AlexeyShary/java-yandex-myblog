@@ -72,4 +72,12 @@ public class PostRepository {
                 post.getId()
         );
     }
+
+    public void updateLikes(Long id, int delta) {
+        jdbcTemplate.update("UPDATE posts SET likes_count = likes_count + ? WHERE id = ?", delta, id);
+    }
+
+    public void deleteById(Long id) {
+        jdbcTemplate.update("DELETE FROM posts WHERE id = ?", id);
+    }
 }
