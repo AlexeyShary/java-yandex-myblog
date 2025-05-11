@@ -1,6 +1,7 @@
 package ru.yandex.practicum.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -30,9 +31,10 @@ public class PostController {
             @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
             Model model
     ) {
-        List<PostDto> posts = postService.getPosts(search, pageNumber, pageSize);
-        model.addAttribute("posts", posts);
-        model.addAttribute("paging", new PagingDto(pageNumber, pageSize, posts.size()));
+        Page<PostDto> page = postService.getPosts(search, pageNumber, pageSize);
+
+        model.addAttribute("posts", page.getContent());
+        model.addAttribute("paging", PagingDto.fromPage(page));
         model.addAttribute("search", search);
 
         return TemplateNames.POSTS.name;

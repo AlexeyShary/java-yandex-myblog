@@ -2,6 +2,7 @@ package ru.yandex.practicum.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.springframework.data.domain.Page;
 
 @Getter
 @AllArgsConstructor
@@ -16,5 +17,9 @@ public class PagingDto {
 
     public boolean hasPrevious() {
         return pageNumber > 0;
+    }
+
+    public static PagingDto fromPage(Page<?> page) {
+        return new PagingDto(page.getNumber(), page.getSize(), (int) page.getTotalElements());
     }
 }
