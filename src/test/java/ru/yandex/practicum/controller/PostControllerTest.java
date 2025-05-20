@@ -25,7 +25,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(PostController.class)
 @Import(PostControllerTest.TestConfig.class)
 public class PostControllerTest {
-
     @Autowired
     private MockMvc mockMvc;
 
