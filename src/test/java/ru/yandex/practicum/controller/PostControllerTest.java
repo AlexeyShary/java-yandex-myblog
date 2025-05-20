@@ -57,7 +57,7 @@ public class PostControllerTest {
     }
 
     @Test
-    void testGetPostsForm() throws Exception {
+    void getPostsFormTest() throws Exception {
         when(mockPostService.getPosts(anyString(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(samplePost()), PageRequest.of(0, 10), 1));
 
@@ -68,7 +68,7 @@ public class PostControllerTest {
     }
 
     @Test
-    void testGetPostByIdForm() throws Exception {
+    void getPostByIdFormTest() throws Exception {
         when(mockPostService.getPostById(1L)).thenReturn(samplePost());
 
         mockMvc.perform(get("/posts/1"))
@@ -78,7 +78,7 @@ public class PostControllerTest {
     }
 
     @Test
-    void testCreatePost() throws Exception {
+    void createPostTest() throws Exception {
         MockMultipartFile file = new MockMultipartFile("image", "file.png", "image/png", "test".getBytes());
 
         mockMvc.perform(multipart("/posts")
@@ -93,7 +93,7 @@ public class PostControllerTest {
     }
 
     @Test
-    void testUpdatePost() throws Exception {
+    void updatePostTest() throws Exception {
         MockMultipartFile file = new MockMultipartFile("image", "file.png", "image/png", "test".getBytes());
 
         mockMvc.perform(multipart("/posts/1")
@@ -109,7 +109,7 @@ public class PostControllerTest {
     }
 
     @Test
-    void testLikePost() throws Exception {
+    void likePostTest() throws Exception {
         mockMvc.perform(post("/posts/1/like").param("like", "true"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/posts/1"));
@@ -118,7 +118,7 @@ public class PostControllerTest {
     }
 
     @Test
-    void testDeletePost() throws Exception {
+    void deletePostTest() throws Exception {
         mockMvc.perform(post("/posts/1/delete"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/posts"));
