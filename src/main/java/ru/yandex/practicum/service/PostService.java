@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import ru.yandex.practicum.dto.CommentDto;
 import ru.yandex.practicum.dto.PostDto;
+import ru.yandex.practicum.exception.NotFoundException;
 import ru.yandex.practicum.model.Post;
 import ru.yandex.practicum.model.Tag;
 import ru.yandex.practicum.repository.PostRepository;
@@ -46,7 +47,7 @@ public class PostService {
 
     public PostDto getPostById(long id) {
         Post post = postRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Post not found: " + id));
         return toDto(post);
     }
 
@@ -109,7 +110,7 @@ public class PostService {
 
     public void updatePost(Long id, String title, String text, String tagsText, MultipartFile image) {
         Post post = postRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+                .orElseThrow(() -> new NotFoundException("Post not found"));
 
         post.setTitle(title);
         post.setText(text);
@@ -133,7 +134,7 @@ public class PostService {
 
     public void likePost(Long id, boolean like) {
         Post post = postRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+                .orElseThrow(() -> new NotFoundException("Post not found"));
         int delta = like ? 1 : -1;
         post.setLikesCount(post.getLikesCount() + delta);
         postRepository.save(post);

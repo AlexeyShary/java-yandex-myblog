@@ -1,6 +1,6 @@
 package ru.yandex.practicum.util;
 
-public enum TemplateNames {
+public enum TemplateNamesUtil {
     EDIT("edit"),
     POST("post"),
     POSTS("posts"),
@@ -8,7 +8,7 @@ public enum TemplateNames {
 
     public final String name;
 
-    TemplateNames(String name) {
+    TemplateNamesUtil(String name) {
         this.name = name;
     }
 }

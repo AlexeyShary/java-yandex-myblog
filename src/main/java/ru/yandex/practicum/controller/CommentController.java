@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import ru.yandex.practicum.service.CommentService;
-import ru.yandex.practicum.util.TemplateNames;
+import ru.yandex.practicum.util.TemplateNamesUtil;
 
 @Controller
 @RequiredArgsConstructor
@@ -21,7 +21,7 @@ public class CommentController {
             @RequestParam("text") String text
     ) {
         commentService.addComment(postId, text);
-        return TemplateNames.REDIRECT_POSTS.name + "/" + postId;
+        return TemplateNamesUtil.REDIRECT_POSTS.name + "/" + postId;
     }
 
     @PostMapping("/{commentId}")
@@ -31,7 +31,7 @@ public class CommentController {
             @RequestParam("text") String text
     ) {
         commentService.updateComment(commentId, text);
-        return TemplateNames.REDIRECT_POSTS.name + "/" + postId;
+        return TemplateNamesUtil.REDIRECT_POSTS.name + "/" + postId;
     }
 
     @PostMapping("/{commentId}/delete")
@@ -40,6 +40,6 @@ public class CommentController {
             @PathVariable("commentId") Long commentId
     ) {
         commentService.deleteComment(commentId);
-        return TemplateNames.REDIRECT_POSTS.name + "/" + postId;
+        return TemplateNamesUtil.REDIRECT_POSTS.name + "/" + postId;
     }
 }

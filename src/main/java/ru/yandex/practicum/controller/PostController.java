@@ -10,9 +10,7 @@ import ru.yandex.practicum.dto.PostDto;
 import ru.yandex.practicum.dto.PostEditDto;
 import ru.yandex.practicum.service.PostService;
 import ru.yandex.practicum.dto.PagingDto;
-import ru.yandex.practicum.util.TemplateNames;
-
-import java.util.List;
+import ru.yandex.practicum.util.TemplateNamesUtil;
 
 @Controller
 @RequiredArgsConstructor
@@ -21,7 +19,7 @@ public class PostController {
 
     @GetMapping("/")
     public String redirectRoot() {
-        return TemplateNames.REDIRECT_POSTS.name;
+        return TemplateNamesUtil.REDIRECT_POSTS.name;
     }
 
     @GetMapping("/posts")
@@ -37,7 +35,7 @@ public class PostController {
         model.addAttribute("paging", PagingDto.fromPage(page));
         model.addAttribute("search", search);
 
-        return TemplateNames.POSTS.name;
+        return TemplateNamesUtil.POSTS.name;
     }
 
     @GetMapping("/posts/{postId}")
@@ -48,13 +46,13 @@ public class PostController {
     ) {
         PostDto post = postService.getPostById(postId);
         model.addAttribute("post", post);
-        return TemplateNames.POST.name;
+        return TemplateNamesUtil.POST.name;
     }
 
     @GetMapping("/posts/add")
     public String getPostAddForm(Model model) {
         model.addAttribute("post", null);
-        return TemplateNames.EDIT.name;
+        return TemplateNamesUtil.EDIT.name;
     }
 
     @GetMapping("/posts/{id}/edit")
@@ -71,7 +69,7 @@ public class PostController {
                 .tagsAsText(String.join(",", post.getTags()))
                 .build());
 
-        return TemplateNames.EDIT.name;
+        return TemplateNamesUtil.EDIT.name;
     }
 
     @PostMapping("/posts")
@@ -82,7 +80,7 @@ public class PostController {
             @RequestParam(value = "image", required = false) MultipartFile image
     ) {
         postService.createPost(title, text, tags, image);
-        return TemplateNames.REDIRECT_POSTS.name;
+        return TemplateNamesUtil.REDIRECT_POSTS.name;
     }
 
     @PostMapping("/posts/{id}")
@@ -94,7 +92,7 @@ public class PostController {
             @RequestParam(value = "image", required = false) MultipartFile image
     ) {
         postService.updatePost(id, title, text, tags, image);
-        return TemplateNames.REDIRECT_POSTS.name;
+        return TemplateNamesUtil.REDIRECT_POSTS.name;
     }
 
     @PostMapping("/posts/{id}/like")
@@ -103,12 +101,12 @@ public class PostController {
             @RequestParam("like") boolean like
     ) {
         postService.likePost(id, like);
-        return TemplateNames.REDIRECT_POSTS.name + "/" + id;
+        return TemplateNamesUtil.REDIRECT_POSTS.name + "/" + id;
     }
 
     @PostMapping("/posts/{id}/edit")
     public String redirectToEdit(@PathVariable("id") Long id) {
-        return TemplateNames.REDIRECT_POSTS.name + "/" + id + "/edit";
+        return TemplateNamesUtil.REDIRECT_POSTS.name + "/" + id + "/edit";
     }
 
     @PostMapping("/posts/{id}/delete")
