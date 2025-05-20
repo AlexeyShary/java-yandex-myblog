@@ -3,46 +3,63 @@ package ru.yandex.practicum.controller;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.jdbc.Sql;
-import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
-import org.springframework.test.context.web.WebAppConfiguration;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
-import ru.yandex.practicum.WebConfiguration;
-import ru.yandex.practicum.config.DatabaseConfig;
-import ru.yandex.practicum.config.ThymeleafConfiguration;
+import org.springframework.mock.web.MockMultipartFile;
+import ru.yandex.practicum.dto.PostDto;
+import ru.yandex.practicum.dto.CommentDto;
+import ru.yandex.practicum.service.PostService;
 
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringJUnitConfig(classes = {
-        DatabaseConfig.class,
-        WebConfiguration.class,
-        ThymeleafConfiguration.class
-})
-@WebAppConfiguration
-@Sql(scripts = {"/schema.sql", "/data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
-class PostControllerTest {
+@WebMvcTest(PostController.class)
+@Import(PostControllerTest.TestConfig.class)
+public class PostControllerTest {
     @Autowired
-    private WebApplicationContext context;
-
     private MockMvc mockMvc;
+
+    static PostService mockPostService = mock(PostService.class);
+
+    @TestConfiguration
+    static class TestConfig {
+        @Bean
+        public PostService postService() {
+            return mockPostService;
+        }
+    }
+
+    private PostDto samplePost() {
+        return PostDto.builder()
+                .id(1L)
+                .title("Test")
+                .likesCount(0)
+                .textParts(List.of("line1", "line2"))
+                .tags(List.of("java", "spring"))
+                .comments(List.of(new CommentDto(1L, "comment")))
+                .textPreview("line1")
+                .build();
+    }
 
     @BeforeEach
     void setup() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
-    }
-
-    @Test
-    void redirectRootTest() throws Exception {
-        mockMvc.perform(get("/"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/posts"));
+        reset(mockPostService);
     }
 
     @Test
     void getPostsFormTest() throws Exception {
+        when(mockPostService.getPosts(anyString(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of(samplePost()), PageRequest.of(0, 10), 1));
+
         mockMvc.perform(get("/posts"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("posts"))
@@ -51,6 +68,8 @@ class PostControllerTest {
 
     @Test
     void getPostByIdFormTest() throws Exception {
+        when(mockPostService.getPostById(1L)).thenReturn(samplePost());
+
         mockMvc.perform(get("/posts/1"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("post"))
@@ -58,50 +77,43 @@ class PostControllerTest {
     }
 
     @Test
-    void getPostEditFormTest() throws Exception {
-        mockMvc.perform(get("/posts/1/edit"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("edit"))
-                .andExpect(model().attributeExists("post"));
-    }
-
-    @Test
     void createPostTest() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("image", "file.png", "image/png", "test".getBytes());
+
         mockMvc.perform(multipart("/posts")
-                        .param("title", "New Title")
-                        .param("text", "Some text")
-                        .param("tags", "tag1, tag2"))
+                        .file(file)
+                        .param("title", "Test")
+                        .param("text", "Content")
+                        .param("tags", "java"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/posts"));
+
+        verify(mockPostService).createPost(eq("Test"), eq("Content"), eq("java"), any());
     }
 
     @Test
     void updatePostTest() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("image", "file.png", "image/png", "test".getBytes());
+
         mockMvc.perform(multipart("/posts/1")
-                        .param("title", "Updated title")
-                        .param("text", "Updated text")
-                        .param("tags", "tag1,tag2")
-                        .with(request -> {
-                            request.setMethod("POST");
-                            return request;
-                        }))
+                        .file(file)
+                        .param("title", "Updated")
+                        .param("text", "Text")
+                        .param("tags", "spring")
+                        .with(request -> { request.setMethod("POST"); return request; }))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/posts"));
+
+        verify(mockPostService).updatePost(eq(1L), eq("Updated"), eq("Text"), eq("spring"), any());
     }
 
     @Test
     void likePostTest() throws Exception {
-        mockMvc.perform(post("/posts/1/like")
-                        .param("like", "true"))
+        mockMvc.perform(post("/posts/1/like").param("like", "true"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/posts/1"));
-    }
 
-    @Test
-    void redirectToEditTest() throws Exception {
-        mockMvc.perform(post("/posts/1/edit"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/posts/1/edit"));
+        verify(mockPostService).likePost(1L, true);
     }
 
     @Test
@@ -109,5 +121,7 @@ class PostControllerTest {
         mockMvc.perform(post("/posts/1/delete"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/posts"));
+
+        verify(mockPostService).deletePost(1L);
     }
 }

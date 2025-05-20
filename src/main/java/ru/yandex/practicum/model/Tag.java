@@ -1,20 +1,24 @@
 package ru.yandex.practicum.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Table;
+import jakarta.persistence.*;
+import lombok.*;
 
-@Data
-@Builder
-@Table("tags")
+import java.util.Set;
+
+@Entity
+@Table(name = "tags")
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Tag {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String name;
+
+    @ManyToMany(mappedBy = "tags")
+    private Set<Post> posts;
 }

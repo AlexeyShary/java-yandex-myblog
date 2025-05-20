@@ -1,16 +1,23 @@
 package ru.yandex.practicum.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import ru.yandex.practicum.dto.CommentDto;
 import ru.yandex.practicum.dto.PostDto;
+import ru.yandex.practicum.exception.NotFoundException;
 import ru.yandex.practicum.model.Post;
-import ru.yandex.practicum.model.PostTag;
 import ru.yandex.practicum.model.Tag;
-import ru.yandex.practicum.repository.CommentRepository;
 import ru.yandex.practicum.repository.PostRepository;
-import ru.yandex.practicum.repository.PostTagRepository;
 import ru.yandex.practicum.repository.TagRepository;
 
 import java.io.IOException;
@@ -21,118 +28,116 @@ import java.util.*;
 
 import static org.apache.commons.io.FilenameUtils.getExtension;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PostService {
     private final PostRepository postRepository;
     private final TagRepository tagRepository;
-    private final PostTagRepository postTagRepository;
-    private final CommentRepository commentRepository;
 
-    public List<PostDto> getPosts(String searchTag, int pageNumber, int pageSize) {
-        int offset = pageNumber * pageSize;
-        List<Post> posts;
+    public Page<PostDto> getPosts(String searchTag, int pageNumber, int pageSize) {
+        Pageable pageable = PageRequest.of(pageNumber, pageSize, Sort.by("createdAt").descending());
 
-        if (searchTag == null || searchTag.isBlank()) {
-            posts = postRepository.findPaged(offset, pageSize);
-        } else {
-            Optional<Tag> tagOpt = tagRepository.findByName(searchTag);
-            if (tagOpt.isEmpty()) return List.of();
-            List<Long> postIds = postTagRepository.findByTagId(tagOpt.get().getId())
-                    .stream().map(PostTag::getPostId).toList();
-            posts = postRepository.findPagedByIds(postIds, offset, pageSize);
-        }
+        Page<Post> page = (searchTag == null || searchTag.isBlank())
+                ? postRepository.findAll(pageable)
+                : postRepository.findByTagName(searchTag, pageable);
 
-        return posts.stream()
-                .map(this::toDto)
-                .toList();
+        return page.map(this::toDto);
     }
 
     public PostDto getPostById(long id) {
-        Post post = postRepository.findByPostId(id)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found: " + id));
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Post not found: " + id));
         return toDto(post);
     }
 
-    public void createPost(String title, String text, String tagsText, MultipartFile image) {
-        String imageUrl = null;
+    public ResponseEntity<Resource> getImageResponse(Long postId) {
+        Optional<Post> optionalPost = postRepository.findById(postId);
 
+        if (optionalPost.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+
+        String filename = optionalPost.get().getImageUrl();
+
+        if (filename == null || filename.isBlank()) {
+            return ResponseEntity.noContent().build();
+        }
+
+        try {
+            Path path = Path.of("uploads").resolve(filename);
+            Resource file = new UrlResource(path.toUri());
+
+            if (!file.exists() || !file.isReadable()) {
+                return ResponseEntity.noContent().build();
+            }
+
+            String contentType = Files.probeContentType(path);
+            MediaType mediaType = contentType != null
+                    ? MediaType.parseMediaType(contentType)
+                    : MediaType.APPLICATION_OCTET_STREAM;
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .body(file);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    public void createPost(String title, String text, String tagsText, MultipartFile image) {
         Post post = Post.builder()
                 .title(title)
                 .text(text)
-                .imageUrl(imageUrl)
                 .likesCount(0)
+                .tags(new HashSet<>())
                 .build();
 
-        Long postId = postRepository.save(post);
-
-        if (image != null && !image.isEmpty()) {
-            try {
-                String filename = "post-" + postId + "." + getExtension(image.getOriginalFilename());
-                Path uploadDir = Paths.get(System.getProperty("user.dir"), "uploads");
-                Files.createDirectories(uploadDir);
-
-                Path path = uploadDir.resolve(filename);
-
-                try {
-                    Files.createDirectories(path.getParent());
-                    image.transferTo(path.toFile());
-                    imageUrl = filename;
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to save image", e);
-                }
-
-                postRepository.updateImageUrl(postId, imageUrl);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to upload image", e);
-            }
+        List<String> tagNames = parseTags(tagsText);
+        for (String tagName : tagNames) {
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
+            post.getTags().add(tag);
         }
 
-        List<String> tags = parseTags(tagsText);
-        saveTags(tags, postId);
+        if (image != null && !image.isEmpty()) {
+            String imageUrl = saveImageTemporarily(image);
+            post.setImageUrl(imageUrl);
+        }
+
+        postRepository.save(post);
     }
 
     public void updatePost(Long id, String title, String text, String tagsText, MultipartFile image) {
-        Post existingPost = postRepository.findByPostId(id)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Post not found"));
 
-        String imageUrl = existingPost.getImageUrl();
+        post.setTitle(title);
+        post.setText(text);
 
         if (image != null && !image.isEmpty()) {
-            try {
-                String filename = "post-" + id + "." + getExtension(image.getOriginalFilename());
-                Path uploadDir = Paths.get(System.getProperty("user.dir"), "uploads");
-                Files.createDirectories(uploadDir);
-
-                Path path = uploadDir.resolve(filename);
-
-                if (imageUrl != null) {
-                    Files.deleteIfExists(uploadDir.resolve(imageUrl));
-                }
-
-                image.transferTo(path.toFile());
-                imageUrl = filename;
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to update image", e);
-            }
+            deleteOldImage(post.getImageUrl());
+            String newImageUrl = saveImageTemporarily(image);
+            post.setImageUrl(newImageUrl);
         }
 
-        Post updatedPost = Post.builder()
-                .id(id)
-                .title(title)
-                .text(text)
-                .imageUrl(imageUrl)
-                .build();
+        Set<Tag> tags = new HashSet<>();
+        for (String tagName : parseTags(tagsText)) {
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
+            tags.add(tag);
+        }
+        post.setTags(tags);
 
-        postRepository.update(updatedPost);
-
-        postTagRepository.deleteByPostId(id);
-        List<String> tags = parseTags(tagsText);
-        saveTags(tags, id);
+        postRepository.save(post);
     }
 
     public void likePost(Long id, boolean like) {
-        postRepository.updateLikes(id, like ? 1 : -1);
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Post not found"));
+        int delta = like ? 1 : -1;
+        post.setLikesCount(post.getLikesCount() + delta);
+        postRepository.save(post);
     }
 
     public void deletePost(Long id) {
@@ -140,20 +145,18 @@ public class PostService {
     }
 
     private PostDto toDto(Post post) {
-        List<String> tags = postTagRepository.findByPostId(post.getId()).stream()
-                .map(pt -> tagRepository.findById(pt.getTagId()).orElse(null))
-                .filter(Objects::nonNull)
+        List<String> tagNames = post.getTags().stream()
                 .map(Tag::getName)
                 .toList();
 
-        List<CommentDto> comments = commentRepository.findByPostId(post.getId()).stream()
+        List<CommentDto> comments = Optional.ofNullable(post.getComments()).orElse(List.of()).stream()
                 .map(c -> new CommentDto(c.getId(), c.getText()))
                 .toList();
 
-        String textPreview = post.getText() != null ?
-                post.getText().split("\n")[0] : "";
-
-        List<String> textParts = Arrays.asList(post.getText().split("\\n+"));
+        String textPreview = post.getText() != null ? post.getText().split("\n")[0] : "";
+        List<String> textParts = post.getText() != null
+                ? Arrays.asList(post.getText().split("\\n+"))
+                : List.of();
 
         return PostDto.builder()
                 .id(post.getId())
@@ -161,7 +164,7 @@ public class PostService {
                 .imageUrl(post.getImageUrl())
                 .likesCount(post.getLikesCount())
                 .textPreview(textPreview)
-                .tags(tags)
+                .tags(tagNames)
                 .comments(comments)
                 .textParts(textParts)
                 .build();
@@ -176,12 +179,29 @@ public class PostService {
                 .toList();
     }
 
-    private void saveTags(List<String> tags, long postId) {
-        for (String tagName : tags) {
-            Tag tag = tagRepository.findByName(tagName)
-                    .orElseGet(() -> tagRepository.save(new Tag(null, tagName)));
+    private String saveImageTemporarily(MultipartFile image) {
+        try {
+            String filename = "post-" + UUID.randomUUID() + "." + getExtension(image.getOriginalFilename());
+            Path uploadDir = Paths.get(System.getProperty("user.dir"), "uploads");
+            Files.createDirectories(uploadDir);
 
-            postTagRepository.save(new PostTag(null, postId, tag.getId()));
+            Path path = uploadDir.resolve(filename);
+            image.transferTo(path.toFile());
+            return filename;
+        } catch (IOException e) {
+            log.error("Save image error {}", e.getMessage());
+            throw new RuntimeException("Failed to save image", e);
+        }
+    }
+
+    private void deleteOldImage(String imageUrl) {
+        if (imageUrl != null) {
+            Path path = Paths.get(System.getProperty("user.dir"), "uploads", imageUrl);
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException e) {
+                log.error("Delete old image error {}", e.getMessage());
+            }
         }
     }
 }

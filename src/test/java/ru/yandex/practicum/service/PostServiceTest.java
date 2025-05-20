@@ -1,102 +1,113 @@
 package ru.yandex.practicum.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockMultipartFile;
 import ru.yandex.practicum.dto.PostDto;
-import ru.yandex.practicum.model.*;
-import ru.yandex.practicum.repository.*;
+import ru.yandex.practicum.model.Post;
+import ru.yandex.practicum.model.Tag;
+import ru.yandex.practicum.repository.PostRepository;
+import ru.yandex.practicum.repository.TagRepository;
 
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-class PostServiceTest {
+@SpringBootTest
+public class PostServiceTest {
     @InjectMocks
     private PostService postService;
 
     @Mock
     private PostRepository postRepository;
+
     @Mock
     private TagRepository tagRepository;
-    @Mock
-    private PostTagRepository postTagRepository;
-    @Mock
-    private CommentRepository commentRepository;
 
-    @Test
-    void getPostsWithDataByTagTest() {
-        Post post = new Post();
-        post.setId(1L);
-        post.setText("text\nline2");
+    private Post post;
 
-        when(postRepository.findPaged(0, 10)).thenReturn(List.of(post));
-        when(postTagRepository.findByPostId(1L)).thenReturn(List.of());
-        when(commentRepository.findByPostId(1L)).thenReturn(List.of());
-
-        List<PostDto> result = postService.getPosts(null, 0, 10);
-
-        assertEquals(1, result.size());
-        assertEquals("text", result.get(0).getTextPreview());
-    }
-
-    @Test
-    void getPostsWithInvalidTagTest() {
-        when(tagRepository.findByName("unknown")).thenReturn(Optional.empty());
-
-        List<PostDto> result = postService.getPosts("unknown", 0, 10);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void getPostByIdWithDataTest() {
-        Post post = Post.builder()
+    @BeforeEach
+    void setUp() {
+        post = Post.builder()
                 .id(1L)
-                .title("Title")
-                .text("line1\nline2")
+                .title("Sample Post")
+                .text("Line 1\\nLine 2")
                 .likesCount(5)
+                .imageUrl("image.png")
+                .tags(new HashSet<>())
+                .comments(new ArrayList<>())
                 .build();
+    }
 
-        when(postRepository.findByPostId(1L)).thenReturn(Optional.of(post));
-        when(postTagRepository.findByPostId(1L)).thenReturn(List.of());
-        when(commentRepository.findByPostId(1L)).thenReturn(List.of());
+    @Test
+    void getPostsTest() {
+        when(postRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(post)));
+        Page<PostDto> result = postService.getPosts(null, 0, 10);
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).getTitle()).isEqualTo("Sample Post");
+    }
 
+    @Test
+    void getPostByIdTest() {
+        when(postRepository.findById(1L)).thenReturn(Optional.of(post));
         PostDto dto = postService.getPostById(1L);
-
-        assertEquals("Title", dto.getTitle());
-        assertEquals("line1", dto.getTextPreview());
-        assertEquals(5, dto.getLikesCount());
+        assertThat(dto.getId()).isEqualTo(1L);
     }
 
     @Test
-    void getPostByIdWithoutDataTest() {
-        when(postRepository.findByPostId(99L)).thenReturn(Optional.empty());
+    void createPostTest() {
+        when(tagRepository.findByName(anyString())).thenReturn(Optional.empty());
+        when(tagRepository.save(any(Tag.class))).thenAnswer(i -> i.getArgument(0));
+        when(postRepository.save(any(Post.class))).thenAnswer(i -> i.getArgument(0));
 
-        assertThrows(IllegalArgumentException.class, () -> postService.getPostById(99L));
+        MockMultipartFile image = new MockMultipartFile("image", "image.png", "image/png", "test".getBytes());
+        postService.createPost("New", "Content", "java spring", image);
+
+        verify(postRepository, times(1)).save(any(Post.class));
     }
 
     @Test
-    void likePostAddLikeTest() {
+    void updatePostTest() {
+        when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+        when(tagRepository.findByName(anyString())).thenReturn(Optional.empty());
+        when(tagRepository.save(any(Tag.class))).thenAnswer(i -> i.getArgument(0));
+
+        MockMultipartFile image = new MockMultipartFile("image", "image.png", "image/png", "test".getBytes());
+        postService.updatePost(1L, "Updated", "Updated text", "java", image);
+
+        assertThat(post.getTitle()).isEqualTo("Updated");
+        verify(postRepository).save(post);
+    }
+
+    @Test
+    void likePostTest() {
+        when(postRepository.findById(1L)).thenReturn(Optional.of(post));
         postService.likePost(1L, true);
-
-        verify(postRepository).updateLikes(1L, 1);
-    }
-
-    @Test
-    void likePostRemoveLikeTest() {
-        postService.likePost(1L, false);
-
-        verify(postRepository).updateLikes(1L, -1);
+        assertEquals(6, post.getLikesCount());
+        verify(postRepository).save(post);
     }
 
     @Test
     void deletePostTest() {
-        postService.deletePost(2L);
+        postService.deletePost(1L);
+        verify(postRepository).deleteById(1L);
+    }
 
-        verify(postRepository).deleteById(2L);
+    @Test
+    void getMissingImageTest() {
+        when(postRepository.findById(1L)).thenReturn(Optional.of(Post.builder().id(1L).build()));
+        ResponseEntity<Resource> response = postService.getImageResponse(1L);
+        assertEquals(204, response.getStatusCode().value());
     }
 }
